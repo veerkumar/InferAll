@@ -27,15 +27,16 @@ class VM(object):
         self.task_type = task_type
         self.spin_up = spin_up
         #print("adding worker id and type",self.id,self.task_type)
-        if task_type == 0:
-            self.free_slots = 6
-            self.max_slots = 6
-        if task_type == 1:
-            self.free_slots = 5
-            self.max_slots = 5
-        if task_type == 2:
-            self.free_slots = 2
-            self.max_slots = 2
+        #A VM can execute any type of task, but during execution, it will make VM exclusive for that task
+        # if task_type == 0:
+        #     self.free_slots = 6
+        #     self.max_slots = 6
+        # if task_type == 1:
+        #     self.free_slots = 5
+        #     self.max_slots = 5
+        # if task_type == 2:
+        #     self.free_slots = 2
+        #     self.max_slots = 2
         self.num_queued_tasks = 0
 
     def add_task(self, task_id, current_time):

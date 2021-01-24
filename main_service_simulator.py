@@ -2,6 +2,8 @@ import time
 import logging
 import math
 import random
+import threading
+from collections import OrderedDict 
 from multiprocessing import Process, Queue
 import copy
 import collections
@@ -44,12 +46,190 @@ class ScheduleLambdaEvent(Event):
                             current_time))
         return self.worker.execute_task(self.job_id, current_time)
 
+# This class used to schedule task to VM or lambda worker
+class Scheduler_thread(threading.Thread):
+	"""docstring for Scheduler_cls"""
+	def __init__(self, config, simulation):
+		super(Scheduler_cls, self).__init__()
+		self.config = config
+		self.simulation =  simulation
 
+	def get_filtered_configuration(self, time_limit):
+		'''
+			This function will generate best possilbe congfiguration for given "Remaining time".
+			Given "Remaining time" and for each accuracy level, get maximum batch size we can go to meet SLO
+		'''
+		#VM calculation
+		# Assumption is that, each VM is running contatiner for all accuracy level (But only one is working at a time)
+		# since rows in profiling are shorted based on model accuracy and time_requriement, we dont have to do much, 
+		# Just filter the result, 3rd dimension is 1d because all batchsize latency are in sorted order
+		vm_filtered_configuration = np.zeros(( len(self.config.vm_models),len(self.config.vm_available_memory), 1),dtype=float)
+		lambda_filtered_configuration = np.zeros((len(self.config.lambda_available_memory), len(self.config.lambda_models), 1),dtype=float)
+		for i, memory in enumerate(self.config.vm_models):
+			#print("i ",i)
+			for j , model in enumerate(self.config.vm_available_memory):
+				#print("j",j)
+				for k, batch in enumerate(self.config.batch_sz):
+					#print("k",k)
+					if (self.config.vm_latency[i][j][k] < time_limit):
+						vm_filtered_configuration[i][j][0] = k
+					else: break
+		# Lambda
+		for i,  memory in enumerate(self.config.lambda_available_memory):
+			for j , model in enumerate(self.config.lambda_models):
+				for k, batch in enumerate(self.config.batch_sz):
+					if (self.config.lambda_latency[i][j][k] < time_limit):
+						lambda_filtered_configuration[i][j][0] = k
+					else: break
+		return (vm_filtered_configuration, lambda_filtered_configuration)
+
+
+		#Lambda calculation
+
+		# Lower accuracy model help us in : Meeting the SLO 
+
+	def get_cost_optimized_configuration_value(self, vm_filtered_configuration,  lambda_filtered_configuration):
+		# This function returns ordered(by cost) dictnory
+		#Input to this function is maximized on Batch size(while satisfing SLO at same time) on each memory,
+		# we will calculate per unit (image) cost
+		vm_cost_estimation = np.zeros((len(self.config.vm_models), len(self.config.vm_available_memory)),dtype=float)
+		lambda_cost_estimation = np.zeros((len(self.config.lambda_models), len(self.config.lambda_available_memory)), dtype=float)
+		for i , model in enumerate(self.config.vm_models):
+			for j, memory in enumerate(self.config.vm_available_memory):
+				#This is per image cost, which will help in favouring larger batch size
+				if (self.config.vm_latency[i][j][int(vm_filtered_configuration[i][j][0])] == self.config.MAX):
+					vm_cost_estimation[i][j] =  self.config.MAX
+				else:
+					vm_cost_estimation[i][j] = \
+					((((self.config.vm_latency[i][j][int(vm_filtered_configuration[i][j][0])])*self.config.MILL_TO_HR)*vm_cost[j])/vm_filtered_configuration[i][j][0])
+
+		for i , model in enumerate(self.config.lambda_models):
+			for j, memory in enumerate(self.config.lambda_available_memory):
+				if (self.config.lambda_latency[i][j][int(lambda_filtered_configuration[i][j][0])] == self.config.MAX):
+					lambda_cost_estimation[i][j] =  self.config.MAX
+				else:
+					lambda_cost_estimation[i][j] = lambda_cost(1,memory,(self.config.lambda_latency[i][j][int(lambda_filtered_configuration[i][j][0])]))
+		return (vm_cost_estimation, lambda_cost_estimation)
+	# def get_slo_latency_optimized_configuration_value(self, vm_filtered_configuration,  lambda_filtered_configuration):
+
+	def get_top_kth_cost_config (vm_cost_estimation, lambda_cost_estimation, top_kth):
+		# This function will return top Kth config for VM and lambda 
+		# (since lambda functions are available in abandannce, just return 1st always)
+		# Also assumption is Every VM is able to run all type of accuracy model, which is not an limitation as based
+		# on the type of optimization, we can start VM with appropriate configuration
+		i =  0;
+		vm_memory_size_idx = 0
+		lambda_memory_size_idx = 0
+
+		'''  Example of vm_cost_estimation, 3 model x 2 memory
+			>>> vm_cost_estimation
+			array([[7.21897917e-07, 1.11557778e-06],
+       			[3.38356667e-06, 2.02709259e-06],
+       			[3.30385556e-06, 1.66444167e-06]])
+		'''
+		vm_dict = {}
+		#  Models are stacked in increase order of efficency, so start from last valid model(as some may not have valid value 
+		#  for cost i.e MAX), Below code construct a row sorted 2D matrix and Pick the top_kth value.
+		i = len(self.config.vm_models) - 1;
+		temp_cost = {}
+		while i >= 0:
+		    j = len(self.config.vm_available_memory)-1
+		    vm_dict = {}
+		    while j >= 0:
+		            vm_dict[vm_cost_estimation[i][j]] = j
+		            j = j - 1
+    		temp_cost[i] = OrderedDict(sorted(vm_dict.items()))
+    		i = i - 1
+    	temp_cost1 = OrderedDict(sorted(temp_cost.items(),reverse=True))
+    	vm_model_idx = 0
+		vm_memory_size_idx = 0
+		done =  0
+		i = 0
+		for key in temp_cost1:
+		    print("")
+		    for j in temp_cost1[key]:
+		        if (j != MAX):
+		            i = i + 1
+		            if (i >= top_kth):
+		                vm_memory_size_idx = temp_cost1[key][j]
+		                vm_model_idx = key
+		                done = 1
+		        print (temp_cost1[key][j], end=' ')
+		        if(done == 1):
+		            break
+		    if(done ==1 ):
+		        break
+		# Lambda function calculation 
+		i = len(self.config.lambda_models) - 1;
+		temp_cost = {}
+		while i >= 0:
+		    j = len(self.config.lambda_available_memory)-1
+		    lm_dict = {}
+		    while j >= 0:
+		            lm_dict[lambda_cost_estimation[i][j]] = j
+		            j = j - 1
+    		temp_cost[i] = OrderedDict(sorted(lm_dict.items()))
+    		i = i - 1
+    	temp_cost1 = OrderedDict(sorted(temp_cost.items(),reverse=True))
+    	lambda_model_idx = 0
+		lambda_memory_size_idx = 0
+		done =  0
+		i = 0
+		for key in temp_cost1:
+		    print("")
+		    for j in temp_cost1[key]:
+		        if (j != MAX):
+		            i = i + 1
+		            if (i >= top_kth):
+		                lambda_memory_size_idx = temp_cost1[key][j]
+		                lambda_model_idx = key
+		                done = 1
+		        print (temp_cost1[key][j], end=' ')
+		        if(done == 1):
+		            break
+		    if(done ==1 ):
+		        break
+
+		# if (top_kth > len(self.config.vm_available_memory)-1):
+		# 	return (-1, lambda_memory_size_idx) # we ran out of VM space
+		return (vm_memory_size_idx, vm_model_idx, lambda_memory_size_idx, lambda_model_idx)
+
+
+
+	def run(self):
+		while True :
+			if not task_queue.empty():
+				task =  self.simulation.task_queue.get()
+				remaining_time =  self.simulation.current_time - task.start_time
+				(vm_filtered_configuration, lambda_filtered_configuration) =  get_filtered_configuration(remaining_time)
+				# optimize on VM or Lambda selection
+				schedule_events = []
+        		if self.config.schedule_type == 0: ########### lambda for scaleup and VM with startup latency #######
+        			if self.config.optimiztion_type = 0 # Cost optimized, choose top most accuracy avaialble
+        				(vm_cost_estimation, lambda_cost_estimation) = \
+        					get_cost_optimized_configuration_value( vm_filtered_configuration, \
+        						lambda_filtered_configuration)
+        				top_kth =  1
+        				while scheduled: 
+        				(vm_memory_size_idx, vm_model_idx, lambda_memory_size_idx, lambda_model_idx) = \
+        							 get_top_kth_cost_config (vm_cost_estimation, lambda_cost_estimation, top_kth)
+        				vm_batch_size =  vm_filtered_configuration
+        				if self.simulation.num_queued_tasks.qsize() >= vm_batch_size:
+	        			else :
+	        				# we will wait for (remaining_time - execution_time) / 4
+	        				threa
+
+
+
+		
 
 class Simulation(object):
 
-    def __init__(self, workload_file, workload_type):
+    #def __init__(self, workload_file, workload_type, configuration, chedule_type, load_tracking, burst_threshold ):
+    def __init__(self, workload_file, workload_type, configuration):
+    	self.configuration =  configuration
         self.workload_file = workload_file
+        self.tasks_file = open(self.workload_file, 'r') # file handle for workload_file
 
         self.tasks = defaultdict()
         self.task_arrival = defaultdict(list)
@@ -57,7 +237,17 @@ class Simulation(object):
         self.VMs = defaultdict(lambda: np.ndarray(0))
         self.completed_VMs = defaultdict(list)
         self.lambdas = defaultdict()
-        self.workload_type = workload_type
+        self.workload_type = workload_type # SPOCK or BATACH
+        self.task_queue = Queue() #Syncronized queue, no need to take lock in mutlitthread
+        self.num_queued_tasks = 0 # Since multiprocessing queue doesnt support iteration, we have to keep total task count
+        self.f = open(self.configuration.VM_stats_path,'w')
+		# self.chedule_type = chedule_type 
+		# self.load_tracking = load_tracking 
+		# self.burst_threshold = burst_threshold 
+		self.finished_file = open(self.configuration.finished_file_path,'w')
+		self.tasks_file = open(self.configuration.all_tasks_path,'w')
+		self.load_file = open(self.configuration.load_file_path,'w')
+		self.current_time = 0 
         
         j = 0
         while j < INITIAL_WORKERS:
@@ -66,8 +256,9 @@ class Simulation(object):
                 self.VMs.setdefault(i, []).append(VM(self,0,start_up_delay,i,4,8192, 0.10,False,len(self.VMs[i])))
                 i += 1
             j += 1
+
     def run(self):
-    	self.tasks_file = open(self.workload_file, 'r')
+    	
         line = self.tasks_file.readline()
         start_time = 0
         num_tasks = 0
@@ -96,16 +287,44 @@ class Simulation(object):
             for new_event in new_events:
                 self.event_queue.put(new_event)
         self.tasks_file.close()
+        # Done with queueing all the task in the task_queue
+        while not self.task_queue.empty():
+        	task =  task_queue.get()
+        	remaining_time = current_time - task.start_time
+        	vm_configuration,  lambda_configuration = self.config.get_best_configuration(remaining_time)
+        	
+
+
 
 
 
 def get_args():
     parser =argparse.ArgumentParser()
-    parser.add_argument('--batch_size', type = int, default = 5, help = "Batch size must be an integer")
-    parser.add_argument('--time_out', type = float, default = 1.0, help = "Timeout value must be a float in seconds")
     parser.add_argument('--trace_name', type = str, default = 'wiki', help = "Name of the traces (1. wiki, 2.berkeley, 3. tweeter, 4. tweeter_BATCH")
+    parser.add_argument('--slo', type=float, default = 100 help='The SLO value in millisecond')
+    parser.add_argument('--optimiztion_type', type = int, default = 0, help = "0 for SLO optimiztion, 1 for cost optimiztion")
+    parser.add_argument('--scheduling_type', type=float, default = 0 help='0 for normal, 1 for LinearRegression')
     return parser.parse_args()
 
+random.seed(1)
+
+
+
 if __name__=="__main__": 
+	 
+	logging.basicConfig(filename='events_log.log',filemode='w',\
+		format='%(levelname)s:%(asctime)s:%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',level=logging.INFO)
+	args = get_args()
 	for i in batch_sz:
 		print(i)
+	#sim = Simulation(sys.argv[1], , ,int(sys.argv[2]),int(sys.argv[3] args.), float(sys.argv[4]))
+	config = Configuration_cls()
+	config.SLO = args.slo
+	config.optimiztion_type = args.optimiztion_type
+	config.scheduling_type =  args.scheduling_type
+	scheduler = Scheduler_cls(config)
+	sim = Simulation(sys.argv[1], args.trace_name, config)
+	sim.run()
+	scheduler.start() # Starting scheduler thread
+	sim.f.close()
+	sim.load_file.close()
