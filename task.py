@@ -56,15 +56,17 @@ class TaskArrival(Event):
         #print ("task arrival new events", new_events)
         return new_events
 
-class SleepEvent(object):
+class SleepEvent(Event):
     def __init__(self, simulation, current_time):
         self.cond = multiprocessing.Condition()
         self.simulation = simulation
         self.start_time = current_time
         
-    def run(self):
+    def run(self, current_time):
         with self.cond:
                 self.cond.notify_all()
+        new_events = []
+        return new_events
 
 
 

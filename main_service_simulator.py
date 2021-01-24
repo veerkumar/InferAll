@@ -211,6 +211,7 @@ class Scheduler_thread(threading.Thread):
         						lambda_filtered_configuration)
         				top_kth =  1
         				resheduling_count = 0 # we have to reshedule to all available memories in VM
+        				vm_memory_size_idx, vm_model_idx, lambda_memory_size_idx, lambda_model_idx
         				while scheduled: 
         					(vm_memory_size_idx, vm_model_idx, lambda_memory_size_idx, lambda_model_idx) = \
         							 get_top_kth_cost_config (vm_cost_estimation, lambda_cost_estimation, top_kth)
@@ -218,11 +219,19 @@ class Scheduler_thread(threading.Thread):
         					expected_execution_time = vm_latency[vm_model_idx][vm_memory_size_idx][vm_filtered_configuration[vm_model_idx][vm_memory_size_idx][0]]
         					print("vm_batch_size selected:", vm_batch_size)
         					print("expected_execution_time:", expected_execution_time)
-        				if self.simulation.num_queued_tasks.qsize() >= vm_batch_size:
-	        			else :
-	        				# we will wait for (remaining_time - execution_time) / 4
-	        				# Add event to the queue with 
-	        				while True:
+        					#TODO Check VM avialblity 
+	        				if self.simulation.num_queued_tasks.qsize() >= vm_batch_size:
+		        			else :
+		        				# we will wait for (remaining_time - execution_time) / 4
+		        				wait_time =  (remaining_time - expected_execution_time)/4
+		        				if (wait_time<0):
+		        					print("Got negative waiting time, SERIOUS ISSUE")
+		        				# Add event to the queue with 
+		        				sleep_event = SleepEvent(self, (current_time  + wait_time) * 1000)
+		        				self.simulation.event_queue.put(((current_time + start_time) * 1000, sleep_event))
+		        				with sleep_event.cond:
+		        					sleep_event.cond.wait()
+
 
 	        				#time.sleep()
 
