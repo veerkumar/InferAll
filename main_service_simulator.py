@@ -194,6 +194,43 @@ class Scheduler_thread(threading.Thread):
 		# 	return (-1, lambda_memory_size_idx) # we ran out of VM space
 		return (vm_memory_size_idx, vm_model_idx, lambda_memory_size_idx, lambda_model_idx)
 
+	def check_free_vm(self, memory):
+		j = 0
+		found = False
+        while j < self.config.INITIAL_WORKERS:
+            i = 0
+            while i < 3:
+                if (self.simulation.VMs[i][j].vmem == memory):
+                	if (self.simulation.VMs[i][j].isIdle == True):
+                		found = True
+                		return (self.simulation.VMs[i][j], found)
+                i += 1
+            j += 1
+        if (found == False):
+        	return (None, found)
+
+    def get_best_possible_vm_and_lambda_config(vm_cost_estimation, lambda_cost_estimation):
+    	vm_memory_size_idx =0
+		vm_model_idx = 0 
+		lambda_memory_size_idx = 0 
+		lambda_model_idx = 0
+		vm_scheduled = False
+		top_kth = 1
+		while True: 
+			(vm_memory_size_idx, vm_model_idx, lambda_memory_size_idx, lambda_model_idx) = \
+					 get_top_kth_cost_config (vm_cost_estimation, lambda_cost_estimation, top_kth)
+					 #TODO Check VM avialblity
+			(vm, found) = check_free_vm(self.config.vm_available_memory[vm_memory_size_idx])
+			if(found == True):
+				vm_scheduled = True
+				return (vm_memory_size_idx, vm_model_idx, vm_scheduled, vm, lambda_memory_size_idx, lambda_model_idx)
+				break
+			else:
+				top_kth = top_kth + 1
+				logging.debug("Scheduler_thread: Best memory is not available, finding next:",top_kth)
+
+		return (0, 0, False, None, lambda_memory_size_idx, lambda_model_idx)
+
 
 
 	def run(self):
@@ -211,15 +248,20 @@ class Scheduler_thread(threading.Thread):
         						lambda_filtered_configuration)
         				top_kth =  1
         				resheduling_count = 0 # we have to reshedule to all available memories in VM
-        				vm_memory_size_idx, vm_model_idx, lambda_memory_size_idx, lambda_model_idx
-        				while scheduled: 
-        					(vm_memory_size_idx, vm_model_idx, lambda_memory_size_idx, lambda_model_idx) = \
-        							 get_top_kth_cost_config (vm_cost_estimation, lambda_cost_estimation, top_kth)
-        					vm_batch_size =  batch_sz[vm_filtered_configuration[vm_model_idx][vm_memory_size_idx][0]]
-        					expected_execution_time = vm_latency[vm_model_idx][vm_memory_size_idx][vm_filtered_configuration[vm_model_idx][vm_memory_size_idx][0]]
-        					print("vm_batch_size selected:", vm_batch_size)
-        					print("expected_execution_time:", expected_execution_time)
-        					#TODO Check VM avialblity 
+        				vm_memory_size_idx =0
+        				vm_model_idx = 0 
+        				lambda_memory_size_idx = 0 
+        				lambda_model_idx = 0
+        				vm_scheduled = False
+        				(vm_memory_size_idx, vm_model_idx, vm_scheduled, vm, lambda_memory_size_idx, lambda_model_idx) = \
+        				get_best_possible_vm_and_lambda_config(vm_cost_estimation, lambda_cost_estimation)
+
+        				if (vm_scheduled):
+	    					vm_batch_size =  self.config.batch_sz[vm_filtered_configuration[vm_model_idx][vm_memory_size_idx][0]]
+	    					expected_execution_time = self.config.vm_latency[vm_model_idx][vm_memory_size_idx][vm_filtered_configuration[vm_model_idx][vm_memory_size_idx][0]]
+	    					print("vm_batch_size selected:", vm_batch_size)
+	    					print("expected_execution_time:", expected_execution_time)
+	    					
 	        				if self.simulation.num_queued_tasks.qsize() >= vm_batch_size:
 		        			else :
 		        				# we will wait for (remaining_time - execution_time) / 4
@@ -266,10 +308,11 @@ class Simulation(object):
 		self.current_time = 0 
         
         j = 0
-        while j < INITIAL_WORKERS:
+        while j < self.configuration.INITIAL_WORKERS:
             i = 0
             while i < 3:
-                self.VMs.setdefault(i, []).append(VM(self,0,start_up_delay,i,4,8192, 0.10,False,len(self.VMs[i])))
+                self.VMs.setdefault(i, []).append(VM(self,0,start_up_delay,i,4,self.config.vm_available_memory[i], \
+                	self.config.vm_cost[i], False, len(self.VMs[i])))
                 i += 1
             j += 1
 

@@ -25,6 +25,7 @@ class Task(object):
 		global c, num
 		
 		logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
+		logging.info("Thread logg")
 		time.sleep(2)
 		i = 0
 		
@@ -57,5 +58,5 @@ if __name__=="__main__":
 			with c.cond:
 				c.cond.notify_all()
 		c.task_queue.put(i)
-	
+	logging.info("Last message")
 	x.join()

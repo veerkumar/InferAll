@@ -95,6 +95,7 @@ class VM(object):
         self.free_slots += 1
         #get_task_events = self.get_task(current_time)
         return []
+        
 class VMCreateEvent(Event):
     def __init__(self,simulation, VM, task_type):
         self.simulation = simulation
