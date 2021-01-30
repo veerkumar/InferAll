@@ -274,10 +274,10 @@ class Scheduler_thread(threading.Thread):
 			        				if (wait_time<0):
 			        					print("Got negative waiting time, SERIOUS ISSUE")
 			        				# Add event to the queue with 
-			        				sleep_event = SleepEvent(self, (current_time  + wait_time) * 1000)
-			        				self.simulation.event_queue.put(((current_time + start_time) * 1000, sleep_event))
-			        				with sleep_event.cond:
-			        					sleep_event.cond.wait()
+			        				sleep_start_event = SleepStartEvent(self, (current_time  + wait_time) * 1000)
+			        				self.simulation.event_queue.put(((current_time + start_time) * 1000, sleep_start_event))
+			        				with sleep_start_event.cond:
+			        					sleep_start_event.cond.wait()
 			        					#Update current time after we waited for the event
 			        					current_time = current_time + wait_time 
 
@@ -346,14 +346,18 @@ class Simulation(object):
         last_time = 0
         self.event_queue.put(((start_time*1000)+60000, PeriodicTimerEvent(self)))
         self.event_queue.put(((start_time*1000)+60000, VM_Monitor_Event(self)))
-        while not self.event_queue.empty():
-            (current_time, event) = self.event_queue.get()
-            print current_time, event, self.event_queue.qsize()
-            #assert current_time >= last_time
-            last_time = current_time
-            new_events = event.run(current_time)
-            for new_event in new_events:
-                self.event_queue.put(new_event)
+        while True : 
+        	if not self.event_queue.empty():
+	            (current_time, event) = self.event_queue.get()
+	            print current_time, event, self.event_queue.qsize()
+	            #assert current_time >= last_time
+	            last_time = current_time
+	            (new_events, status) = event.run(current_time)
+	            if ((new_events is None) and status == False):
+	            	break #This means everything in trace file is read completely
+	            else: 
+	            	for new_event in new_events:
+	                self.event_queue.put(new_event)
         self.tasks_file.close()
         # Done with queueing all the task in the task_queue
         while not self.task_queue.empty():

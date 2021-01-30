@@ -22,51 +22,97 @@ class TaskArrival(Event):
                 % (task.id, current_time))
 
         # Queue the task to task schedular.
-        new_events = self.simulation.task_queue.put((task, current_time))
+        new_events = []
+        self.simulation.task_queue.put((task, current_time))
 
 
         #new_events = self.simulation.send_tasks(task, current_time)
 
         logging.getLogger('sim').debug('Retuning %s events'
                 % len(new_events))
+        
+        #print ("task arrival new events", new_events)
+        return (new_events, True)
+
+class EndOfFileEvent(Event):
+    """docstring for EndOfFileEvent"""
+    def __init__(self, simulation, start_time):
+        super(EndOfFileEvent, self).__init__()
+        self.simulation = simulation
+        self.start_time = start_time
+
+    def run(self):
+        return (None, False)
+
+        
+
+class SleepEndEvent(Event):
+    def __init__(self, simulation, start_time, condition):
+        self.cond = condition
+        self.simulation = simulation
+        self.start_time = start_time
+        
+    def run(self):
+        with self.cond:
+                self.cond.notify_all()
+        new_events = []
+        return new_events
+
+class SleepStartEvent(Event):
+    """docstring for SleepStartEvent"""
+    def __init__(self, simulation, start_time):
+        super(SleepStartEvent, self).__init__()
+        self.cond = multiprocessing.Condition()
+        self.simulation = simulation
+        self.start_time = start_time
+
+    def run(self):
         line = self.simulation.tasks_file.readline()
-        start_time = 0
+        s_time = 0
         num_tasks = 0
         task_type = 0
-        #print line
-        if line == '':
-            print('task empty')
-            last_task = 1
-            return new_events
-        if self.simulation.workload_type == "tweeter_BATCH":
-            start_time = float(line.split('\n')[0])
-            num_tasks = 1
-            task_type = 1
-        else: 
-            start_time = float(line.split(',')[0])
-            num_tasks = line.split(',')[3]
-            task_type = line.split(',')[2]
+        last_task = 0
+        last_start_time = 0
+        while True:
+            #print line
+            if line == '':
+                print('task empty')
+                last_task = 1
+                break
+            else:
+                if self.simulation.workload_type == "tweeter_BATCH":
+                    s_time = float(line.split('\n')[0])
+                    num_tasks = 1
+                    task_type = 1
+                else: 
+                    s_time = float(line.split(',')[0])
+                    num_tasks = line.split(',')[3]
+                    task_type = line.split(',')[2]
 
+                if (s_time <= (self.start_time/1000)):
+                    new_events.append((s_time * 1000, TaskArrival(self.simulation, s_time*1000, num_tasks, task_type)))
+                else:
+                    new_events.append((self.start_time*1000,SleepEndEvent(self.simulation, start_time*1000, self.cond)))
+                    #TODO Check this logic again
+                    new_events.append((s_time * 1000, TaskArrival(self.simulation, s_time*1000, num_tasks, task_type)))
+                    break
+            last_start_time =  s_time
+            line = self.simulation.tasks_file.readline()
+
+        if (last_task):
+            # Randomly add time
+            new_events.append(((last_start_time + 100) * 1000, EndOfFileEvent(self.simulation, (last_start_time + 100)*1000)))
+            
+            # 
         #print "adding new task",int(start_time*1000), num_tasks, task_type
         # new_task = Task(self, line, 1000, start_time, num_tasks, task_type)
 
         new_events.append((start_time * 1000,
             TaskArrival(self.simulation, start_time
                 * 1000, num_tasks, task_type)))
-        #print ("task arrival new events", new_events)
-        return new_events
 
-class SleepEvent(Event):
-    def __init__(self, simulation, current_time):
-        self.cond = multiprocessing.Condition()
-        self.simulation = simulation
-        self.start_time = current_time
+
         
-    def run(self, current_time):
-        with self.cond:
-                self.cond.notify_all()
-        new_events = []
-        return new_events
 
 
 
