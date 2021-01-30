@@ -82,6 +82,7 @@ class Configuration_cls(object):
 		self.cost_path = os.path.join('outputs', 'cost')
 		self.optimiztion_type = 0
 		self.scheduling_type = 0
+		self.rescheduling_limit = 4
 
 
 

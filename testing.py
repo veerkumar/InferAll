@@ -20,10 +20,11 @@ class Task(object):
 		print("Init function in task")
 		self.config = arg
 
-	def task_scheduler(self):
+	def task_scheduler(self, name):
 		print("In tas function function in task")
 		global c, num
-		
+		print(name)
+		logging.info ("Thread: Frist name:" + name)
 		logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
 		logging.info("Thread logg")
 		time.sleep(2)
@@ -35,7 +36,10 @@ class Task(object):
 				if i == 9:
 					self.config.cond.wait()
 					print("recevid")
+					name = "Kumar"
 				print(c.task_queue.get())
+		print(name)
+		logging.info ("Thread: Last name:"+ name)
 
 if __name__=="__main__": 
 	
@@ -45,9 +49,10 @@ if __name__=="__main__":
 	logging.debug('This message should appear on the console')
 	logging.info('So should this')
 	logging.warning('And this, too')
+	name = "Veer"
 	t =  Task(c)
 	
-	x = threading.Thread(target=t.task_scheduler, args=())
+	x = threading.Thread(target=t.task_scheduler, args=(name,))
 	
 	logging.warning('NEW WARNING And this, too')
 	x.start()
@@ -59,4 +64,6 @@ if __name__=="__main__":
 				c.cond.notify_all()
 		c.task_queue.put(i)
 	logging.info("Last message")
+	
 	x.join()
+	logging.info ("Final name:" + name)

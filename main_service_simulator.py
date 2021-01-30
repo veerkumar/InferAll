@@ -262,17 +262,26 @@ class Scheduler_thread(threading.Thread):
 	    					print("vm_batch_size selected:", vm_batch_size)
 	    					print("expected_execution_time:", expected_execution_time)
 	    					
-	        				if self.simulation.num_queued_tasks.qsize() >= vm_batch_size:
-		        			else :
-		        				# we will wait for (remaining_time - execution_time) / 4
-		        				wait_time =  (remaining_time - expected_execution_time)/4
-		        				if (wait_time<0):
-		        					print("Got negative waiting time, SERIOUS ISSUE")
-		        				# Add event to the queue with 
-		        				sleep_event = SleepEvent(self, (current_time  + wait_time) * 1000)
-		        				self.simulation.event_queue.put(((current_time + start_time) * 1000, sleep_event))
-		        				with sleep_event.cond:
-		        					sleep_event.cond.wait()
+	    					while True:
+	    						resheduling_count = resheduling_count + 1
+		        				if (resheduling_count >= self.config.rescheduling_limit or \
+		        					self.simulation.num_queued_tasks.qsize() >= vm_batch_size):
+		        					#schedule VM 
+		        					break
+			        			else :
+			        				# we will wait for (remaining_time - execution_time) / 4.
+			        				wait_time =  (remaining_time - expected_execution_time)/rescheduling_limit
+			        				if (wait_time<0):
+			        					print("Got negative waiting time, SERIOUS ISSUE")
+			        				# Add event to the queue with 
+			        				sleep_event = SleepEvent(self, (current_time  + wait_time) * 1000)
+			        				self.simulation.event_queue.put(((current_time + start_time) * 1000, sleep_event))
+			        				with sleep_event.cond:
+			        					sleep_event.cond.wait()
+			        					#Update current time after we waited for the event
+			        					current_time = current_time + wait_time 
+
+
 
 
 	        				#time.sleep()
