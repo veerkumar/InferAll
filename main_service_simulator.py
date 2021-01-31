@@ -280,6 +280,7 @@ class Scheduler_thread(threading.Thread):
 
 
 	        				#time.sleep()
+	        # We need to wait for expected time to get enough jobs and VM freed.
 
 
 

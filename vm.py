@@ -39,9 +39,9 @@ class VM(object):
         #     self.max_slots = 2
         self.num_queued_tasks = 0
 
-    def add_task(self, task_id, current_time):
+    def add_task(self, task_id_list, current_time):
         #print("adding new task to VM", task_id,self.id)
-        self.queued_tasks.put((current_time,task_id))
+        #self.queued_tasks.put((current_time,task_id))
         self.isIdle = False
         new_events = self.get_task(current_time)
         self.spin_up = False
@@ -56,39 +56,28 @@ class VM(object):
             self.lastIdleTime = current_time
             return True
         return False
-    def get_task(self, current_time):
+    def get_task(self, current_time, task_id_list):
         new_events = []
         #print("running task on worker",self.id,self.task_type)
-        if not self.queued_tasks.empty():
-            #print "task queued", self.num_queued_tasks, self.queued_tasks.qsize()
-            #print("worker not empty at time",self.id,self.task_type,current_time)
-            if(self.free_slots == 0):
-
-                #print self.id," task queued delay", self.num_queued_tasks
-                (queue_time,task_id) = self.queued_tasks.get()
-                #print current_time + self.simulation.tasks[task_id].exec_time + 10, self.simulation.tasks[task_id].start_time
-                new_events.append((current_time + self.simulation.tasks[task_id].exec_time + 10,ScheduleVMEvent(self,task_id)))
-                return new_events
-
-            #print self.id,self.num_queued_tasks,self.free_slots,"executing task"
-            self.free_slots -= 1
-            self.num_queued_tasks -= 1
-            (queue_time,task_id) = self.queued_tasks.get()
-            task_duration = self.simulation.tasks[task_id].exec_time
-            probe_response_time = 5 + current_time
-            if task_duration > 0:
-                task_end_time = task_duration + probe_response_time
-                #print("worker not empty at time",self.id,self.task_type,task_end_time)
-                new_event = TaskEndEvent(self)
-                task = self.simulation.tasks[task_id]
-                #if task.id >=15548:
-                 #   print ("task id ", task.id, "task type" , "VM id" , self.id, task.task_type, "task_end_time ", task_end_time, "task_start_time:",task.start_time, " each_task_running_time: ",(task_end_time - task.start_time))
-                print >> tasks_file,"task_id ,", task.id,",",  "task_type," ,task.task_type, ",", "VM_id," , self.id ,",", "task_end_time ,", task_end_time, ",", "task_start_time,",task.start_time, ",", " each_task_running_time,",(task_end_time - task.start_time), ",", " task_queuing_time:,", (task_end_time - task.start_time) - task.exec_time
-                if(self.simulation.add_task_completion_time(task_id,
-                    task_end_time,0)):
-                    #print "writing to file"
-                    print >> finished_file,"num tasks ", task.num_tasks, "," ,"VM_tasks ,", task.vm_tasks,"lambda_tasks ,", task.lambda_tasks , "task_end_time, ", task_end_time, "task_start_time,",task.start_time, " each_task_running_time ,",(task.end_time - task.start_time)
-                return [(task_end_time, new_event)]
+        for task_id in task_id_list:
+            
+        
+        (queue_time,task_id) = self.queued_tasks.get()
+        task_duration = self.simulation.tasks[task_id].exec_time
+        probe_response_time = 5 + current_time
+        if task_duration > 0:
+            task_end_time = task_duration + probe_response_time
+            #print("worker not empty at time",self.id,self.task_type,task_end_time)
+            new_event = TaskEndEvent(self)
+            task = self.simulation.tasks[task_id]
+            #if task.id >=15548:
+             #   print ("task id ", task.id, "task type" , "VM id" , self.id, task.task_type, "task_end_time ", task_end_time, "task_start_time:",task.start_time, " each_task_running_time: ",(task_end_time - task.start_time))
+            print >> tasks_file,"task_id ,", task.id,",",  "task_type," ,task.task_type, ",", "VM_id," , self.id ,",", "task_end_time ,", task_end_time, ",", "task_start_time,",task.start_time, ",", " each_task_running_time,",(task_end_time - task.start_time), ",", " task_queuing_time:,", (task_end_time - task.start_time) - task.exec_time
+            if(self.simulation.add_task_completion_time(task_id,
+                task_end_time,0)):
+                #print "writing to file"
+                print >> finished_file,"num tasks ", task.num_tasks, "," ,"VM_tasks ,", task.vm_tasks,"lambda_tasks ,", task.lambda_tasks , "task_end_time, ", task_end_time, "task_start_time,",task.start_time, " each_task_running_time ,",(task.end_time - task.start_time)
+            return [(task_end_time, new_event)]
         return []
 
     def free_slot(self, current_time):
