@@ -46,5 +46,16 @@ class MyServerless(threading.Thread):
 		return batch_service_time['Payload'].read()
 
 	def send_simulated_request(self):
-		
+
+class ScheduleLambdaEvent(Event):
+
+    def __init__(self, worker, job_id):
+        self.worker = worker
+        self.job_id = job_id
+    def run(self, current_time):
+        logging.getLogger('sim'
+                ).debug('Probe for job %s arrived at %s'
+                        % (self.job_id,
+                            current_time))
+        return self.worker.execute_task(self.job_id, current_time)
 

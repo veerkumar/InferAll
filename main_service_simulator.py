@@ -21,30 +21,6 @@ from utils import *
 from vm import *
 from lambda_serverless import *
 
-class ScheduleVMEvent(Event):
-
-    def __init__(self, worker, job_id):
-        self.worker = worker
-        self.job_id = job_id
-        self.worker.num_queued_tasks += 1
-    def run(self, current_time):
-        logging.getLogger('sim'
-                ).debug('Probe for job %s arrived at worker %s at %s'
-                        % (self.job_id, self.worker.id,
-                            current_time))
-        return self.worker.add_task(self.job_id, current_time)
-
-class ScheduleLambdaEvent(Event):
-
-    def __init__(self, worker, job_id):
-        self.worker = worker
-        self.job_id = job_id
-    def run(self, current_time):
-        logging.getLogger('sim'
-                ).debug('Probe for job %s arrived at %s'
-                        % (self.job_id,
-                            current_time))
-        return self.worker.execute_task(self.job_id, current_time)
 
 # This class used to schedule task to VM or lambda worker
 class Scheduler_thread(threading.Thread):
@@ -236,7 +212,10 @@ class Scheduler_thread(threading.Thread):
 	def run(self):
 		while True :
 			if not task_queue.empty():
+				task_id_list = []
 				task =  self.simulation.task_queue.get()
+				task_id_list.append(task.id)
+				total_scheduled_tasks = task.num_tasks
 				remaining_time =  self.simulation.current_time - task.start_time
 				(vm_filtered_configuration, lambda_filtered_configuration) =  get_filtered_configuration(remaining_time)
 				# optimize on VM or Lambda selection
@@ -265,8 +244,16 @@ class Scheduler_thread(threading.Thread):
 	    					while True:
 	    						resheduling_count = resheduling_count + 1
 		        				if (resheduling_count >= self.config.rescheduling_limit or \
-		        					self.simulation.num_queued_tasks.qsize() >= vm_batch_size):
+		        					self.simulation.num_queued_tasks >= vm_batch_size):
 		        					#schedule VM 
+		        					self.simulation.num_queued_tasks -= task.num_tasks
+		        					while  total_scheduled_tasks < vm_batch_size:
+		        						temp_task = self.simulation.task_queue.get()
+		        						task_id_list.append(temp_task.id)
+		        						self.simulation.num_queued_tasks -= temp_task.num_tasks
+		        						total_scheduled_tasks += temp_task.num_tasks
+		        					print("Scheduling VM with num_tasks: {}, while batch_size: {}".format(total_scheduled_tasks,vm_batch_size))
+		        					self.simulation.schedule_events.append((current_time, ScheduleVMEvent(vm, expected_execution_time, task_id_list)))
 		        					break
 			        			else :
 			        				# we will wait for (remaining_time - execution_time) / 4.
@@ -280,6 +267,14 @@ class Scheduler_thread(threading.Thread):
 			        					sleep_start_event.cond.wait()
 			        					#Update current time after we waited for the event
 			        					current_time = current_time + wait_time 
+
+			        	# Scheduling Lambda function
+			        	else:
+			        		lambda_batch_size =  self.config.batch_sz[lambda_filtered_configuration[lambda_model_idx][lambda_memory_size_idx][0]]
+	    					expected_execution_time = self.config.lambda_latency[lambda_model_idx][lambda_memory_size_idx][lambda_filtered_configuration[lambda_model_idx][lambda_memory_size_idx][0]]
+	    					print("vm_batch_size selected:", lambda_batch_size)
+	    					print("expected_execution_time:", expected_execution_time)
+
 
 
 
@@ -326,7 +321,7 @@ class Simulation(object):
             j += 1
 
     def run(self):
-    	
+    	seen_end_of_file= False
         line = self.tasks_file.readline()
         start_time = 0
         num_tasks = 0
@@ -354,17 +349,16 @@ class Simulation(object):
 	            last_time = current_time
 	            (new_events, status) = event.run(current_time)
 	            if ((new_events is None) and status == False):
-	            	break #This means everything in trace file is read completely
+	            	seen_end_of_file =  True #This means everything in trace file is read completely
 	            else: 
 	            	for new_event in new_events:
 	                self.event_queue.put(new_event)
+	        if (self.event_queue.empty() and self.task_queue.empty() and seen_end_of_file):
+	        	break
+
         self.tasks_file.close()
         # Done with queueing all the task in the task_queue
-        while not self.task_queue.empty():
-        	task =  task_queue.get()
-        	remaining_time = current_time - task.start_time
-        	vm_configuration,  lambda_configuration = self.config.get_best_configuration(remaining_time)
-        	
+        
 
 
 

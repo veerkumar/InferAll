@@ -24,9 +24,7 @@ class TaskArrival(Event):
         # Queue the task to task schedular.
         new_events = []
         self.simulation.task_queue.put((task, current_time))
-
-
-        #new_events = self.simulation.send_tasks(task, current_time)
+        self.simulation.num_queued_tasks = self.simulation.num_queued_tasks + self.num_tasks
 
         logging.getLogger('sim').debug('Retuning %s events'
                 % len(new_events))
@@ -56,7 +54,7 @@ class SleepEndEvent(Event):
         with self.cond:
                 self.cond.notify_all()
         new_events = []
-        return new_events
+        return (new_events, True)
 
 class SleepStartEvent(Event):
     """docstring for SleepStartEvent"""
@@ -106,14 +104,10 @@ class SleepStartEvent(Event):
             # 
         #print "adding new task",int(start_time*1000), num_tasks, task_type
         # new_task = Task(self, line, 1000, start_time, num_tasks, task_type)
+        for new_event in new_events:
+                self.simulation.event_queue.put(new_event)
 
-        new_events.append((start_time * 1000,
-            TaskArrival(self.simulation, start_time
-                * 1000, num_tasks, task_type)))
-
-
-        
-
+        return ([],True) #Since we already added the events so returning empty list
 
 
 class Task(object):

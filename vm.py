@@ -95,7 +95,20 @@ class VM(object):
         self.free_slots += 1
         #get_task_events = self.get_task(current_time)
         return []
-        
+
+class ScheduleVMEvent(Event):
+
+    def __init__(self, worker, job_id):
+        self.worker = worker
+        self.job_id = job_id
+        self.worker.num_queued_tasks += 1
+    def run(self, current_time):
+        logging.getLogger('sim'
+                ).debug('Probe for job %s arrived at worker %s at %s'
+                        % (self.job_id, self.worker.id,
+                            current_time))
+        return self.worker.add_task(self.job_id, current_time)
+
 class VMCreateEvent(Event):
     def __init__(self,simulation, VM, task_type):
         self.simulation = simulation
