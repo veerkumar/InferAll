@@ -20,15 +20,17 @@ from config import *
 from utils import *
 from vm import *
 from lambda_serverless import *
+from periodic_events import *
 
 
 # This class used to schedule task to VM or lambda worker
-class Scheduler_thread(threading.Thread):
+class Scheduler_cls(object):
 	"""docstring for Scheduler_cls"""
 	def __init__(self, config, simulation):
 		super(Scheduler_cls, self).__init__()
 		self.config = config
 		self.simulation =  simulation
+		self.clear_internal_state()
 
 	def get_filtered_configuration(self, time_limit):
 		'''
@@ -225,74 +227,88 @@ class Scheduler_thread(threading.Thread):
 
 		return (vm_memory_size_idx, vm_model_idx, False, None, lambda_memory_size_idx, lambda_model_idx)
 
+	def clear_internal_state(self):
+		self.resheduling_count = 0
+		self.remaining_time = 0
+		self.top_kth =  1
+		self.resheduling_count = 0 # we have to reshedule to all available memories in VM
+		self.vm_memory_size_idx =0
+		self.vm_model_idx = 0 
+		self.lambda_memory_size_idx = 0 
+		self.lambda_model_idx = 0
+		self.vm_scheduled = False
+		self.vm_filtered_configuration = None
+		self.lambda_filtered_configuration = None
+		self.vm_cost_estimation = None
+		self.lambda_cost_estimation = None
+		self.vm = None # VM to be used if available 
 
 
-	def run(self):
-		while True :
-			if not task_queue.empty():
-				task_id_list = []
-				task =  self.simulation.task_queue.get()
-				task_id_list.append(task.id)
-				total_scheduled_tasks = task.num_tasks
-				remaining_time =  self.simulation.current_time - task.start_time
-				(vm_filtered_configuration, lambda_filtered_configuration) =  get_filtered_configuration(remaining_time)
-				# optimize on VM or Lambda selection
-				schedule_events = []
-        		if self.config.schedule_type == 0: ########### lambda for scaleup and VM with startup latency #######
-        			if self.config.optimiztion_type = 0 # Cost optimized, choose top most accuracy avaialble
-        				(vm_cost_estimation, lambda_cost_estimation) = \
-        					get_cost_optimized_configuration_value( vm_filtered_configuration, \
-        						lambda_filtered_configuration)
-        				top_kth =  1
-        				resheduling_count = 0 # we have to reshedule to all available memories in VM
-        				vm_memory_size_idx =0
-        				vm_model_idx = 0 
-        				lambda_memory_size_idx = 0 
-        				lambda_model_idx = 0
-        				vm_scheduled = False
-        				(vm_memory_size_idx, vm_model_idx, vm_scheduled, vm, lambda_memory_size_idx, lambda_model_idx) = \
-        				get_best_possible_vm_and_lambda_config(vm_cost_estimation, lambda_cost_estimation)
+	def run(self, task, current_time):
+		task_id_list = []
+		task_id_list.append(task.id)
+		total_scheduled_tasks = task.num_tasks
+		schedule_events = []
 
-        				if (vm_scheduled):
-        					vm_batch_size_idx = vm_filtered_configuration[vm_model_idx][vm_memory_size_idx][0]
-	    					vm_batch_size =  self.config.batch_sz[vm_batch_size_idx]
-	    					expected_execution_time = self.config.vm_latency[vm_model_idx][vm_memory_size_idx][vm_batch_size_idx]
-	    					print("vm_batch_size selected:", vm_batch_size)
-	    					print("expected_execution_time:", expected_execution_time)
-	    					signal_main_thread =  False
-	    					while True:
-	    						resheduling_count = resheduling_count + 1
-		        				if (resheduling_count >= self.config.rescheduling_limit or \
-		        					self.simulation.num_queued_tasks >= vm_batch_size):
-		        					#schedule VM 
-		        					self.simulation.num_queued_tasks -= task.num_tasks
-		        					while  total_scheduled_tasks < vm_batch_size:
-		        						temp_task = self.simulation.task_queue.get()
-		        						task_id_list.append(temp_task.id)
-		        						self.simulation.num_queued_tasks -= temp_task.num_tasks
-		        						total_scheduled_tasks += temp_task.num_tasks
-		        					print("Scheduling VM with num_tasks: {}, while batch_size: {}".format(total_scheduled_tasks,vm_batch_size))
-		        					self.simulation.event_queue.put((current_time, ScheduleVMEvent(vm, vm_batch_size, vm_model_idx expected_execution_time, task_id_list)))
-		        					if (signal_main_thread):
-		        						with self.simulation.simulation_cond:
-		        							self.simulation.simulation_cond.notify_all()
-		        					break
-			        			else :
-			        				# we will wait for (remaining_time - execution_time) / 4.
-			        				wait_time =  (remaining_time - expected_execution_time)/rescheduling_limit
-			        				if (wait_time<0):
-			        					print("Got negative waiting time, SERIOUS ISSUE")
-			        				# Add event to the queue with 
-			        				sleep_start_event = SleepStartEvent(self, (current_time  + wait_time) * 1000)
-			        				self.simulation.event_queue.put(((current_time + start_time) * 1000, sleep_start_event))
-			        				if (signal_main_thread):
-		        						with self.simulation.simulation_cond:
-		        							self.simulation.simulation_cond.notify_all()
-			        				with sleep_start_event.cond:
-			        					sleep_start_event.cond.wait()
-			        					#Update current time after we waited for the event
-			        					current_time = current_time + wait_time 
-			        					signal_main_thread = True
+		if(resheduling_count == 0):
+			self.remaining_time =  current_time - task.start_time
+			print("In Scheduler: current_time: {}, task.start_time {}, remaining_time {}".format(current_time,task.start_time, remaining_time))
+			# optimize on VM or Lambda selection
+			(self.vm_filtered_configuration, self.lambda_filtered_configuration) =  get_filtered_configuration(self.remaining_time)
+
+				
+				
+        if self.config.schedule_type == 0: ########### lambda for scaleup and VM with startup latency #######
+        	if self.config.optimiztion_type = 0 # Cost optimized, choose top most accuracy avaialble
+        		if self.resheduling_count == 0: # This will execute only one time
+        			(self.vm_cost_estimation, self.lambda_cost_estimation) = \
+        					get_cost_optimized_configuration_value( self.vm_filtered_configuration, \
+        						self.lambda_filtered_configuration)
+        				
+        			(self.vm_memory_size_idx, self.vm_model_idx, self.vm_scheduled, self.vm, self.lambda_memory_size_idx, self.lambda_model_idx) = \
+        				get_best_possible_vm_and_lambda_config(self.vm_cost_estimation, self.lambda_cost_estimation)
+        		new_events = []
+        		if (self.vm_scheduled):
+					vm_batch_size_idx = vm_filtered_configuration[self.vm_model_idx][self.vm_memory_size_idx][0]
+					vm_batch_size =  self.config.batch_sz[vm_batch_size_idx]
+					expected_execution_time = self.config.vm_latency[self.vm_model_idx][self.vm_memory_size_idx][vm_batch_size_idx]
+					print("vm_batch_size selected:", vm_batch_size)
+					print("expected_execution_time:", expected_execution_time)
+					#signal_main_thread =  False
+					self.resheduling_count = self.resheduling_count + 1
+    				if (self.resheduling_count >= self.config.rescheduling_limit or \
+    					self.simulation.num_queued_tasks >= vm_batch_size):
+    					#schedule VM 
+    					self.simulation.num_queued_tasks -= task.num_tasks
+    					while  total_scheduled_tasks < vm_batch_size:
+    						temp_task = self.simulation.task_queue.get()
+    						task_id_list.append(temp_task.id)
+    						self.simulation.num_queued_tasks -= temp_task.num_tasks
+    						total_scheduled_tasks += temp_task.num_tasks
+    					print("Scheduling VM with num_tasks: {}, while batch_size: {}".format(total_scheduled_tasks, vm_batch_size))
+    					new_events.put((current_time, ScheduleVMEvent(self.vm, self.vm_batch_size, self.vm_model_idx, self.expected_execution_time, task_id_list)))
+    					# if (signal_main_thread):
+    					# 	with self.simulation.simulation_cond:
+    					# 		self.simulation.simulation_cond.notify_all()
+    					# break
+    					self.clear_internal_state()
+    					return new_events
+        			else :
+        				# we will wait for (remaining_time - execution_time) / 4.
+        				wait_time =  (remaining_time - expected_execution_time)/rescheduling_limit
+        				if (wait_time<0):
+        					print("Got negative waiting time, SERIOUS ISSUE")
+        				# Add event to the queue with 
+        				sleep_start_event = SleepStartEvent(self, (current_time  + wait_time) * 1000)
+        				self.simulation.event_queue.put(((current_time + start_time) * 1000, sleep_start_event))
+        		# 		if (signal_main_thread):
+    						# with self.simulation.simulation_cond:
+    						# 	self.simulation.simulation_cond.notify_all()
+        		# 		with sleep_start_event.cond:
+        		# 			sleep_start_event.cond.wait()
+        		# 			#Update current time after we waited for the event
+        		# 			current_time = current_time + wait_time 
+        		# 			signal_main_thread = True
 
 
 			        	# Scheduling Lambda function
@@ -343,18 +359,15 @@ class Scheduler_thread(threading.Thread):
 
 
 
-	        				#time.sleep()
-	        # We need to wait for expected time to get enough jobs and VM freed.
-
-
 
 		
 
 class Simulation(object):
 
     #def __init__(self, workload_file, workload_type, configuration, chedule_type, load_tracking, burst_threshold ):
-    def __init__(self, workload_file, workload_type, configuration):
+    def __init__(self, workload_file, workload_type, configuration, scheduler):
     	self.configuration =  configuration
+    	self.scheduler_obj = scheduler
         self.workload_file = workload_file
         self.tasks_file = open(self.workload_file, 'r') # file handle for workload_file
 
@@ -369,20 +382,22 @@ class Simulation(object):
         self.num_queued_tasks = 0 # Since multiprocessing queue doesnt support iteration, we have to keep total task count
         self.f = open(self.configuration.VM_stats_path,'w')
 		# self.chedule_type = chedule_type 
-		# self.load_tracking = load_tracking 
+		self.load_tracking = 0 
 		# self.burst_threshold = burst_threshold 
 		self.finished_file = open(self.configuration.finished_file_path,'w')
 		self.tasks_file = open(self.configuration.all_tasks_path,'w')
 		self.load_file = open(self.configuration.load_file_path,'w')
 		self.current_time = 0 
 		self.simulation_cond = multiprocessing.Condition()
+		self.last_task = 0
+		self.VM_PREDICTION = 0
         
         j = 0
         while j < self.configuration.INITIAL_WORKERS:
             i = 0
             while i < 3:
                 self.VMs.setdefault(i, []).append(VM(self,0,start_up_delay,i,4,self.config.vm_available_memory[i], \
-                	self.config.vm_cost[i], False, len(self.VMs[i])))
+                	self.config.vm_cost[i], True, len(self.VMs[i])))
                 i += 1
             j += 1
 
@@ -429,20 +444,17 @@ class Simulation(object):
         last_time = 0
         self.event_queue.put(((start_time*1000)+60000, PeriodicTimerEvent(self)))
         self.event_queue.put(((start_time*1000)+60000, VM_Monitor_Event(self)))
-        while True : 
-        	if not self.event_queue.empty():
-	            (current_time, event) = self.event_queue.get()
-	            print current_time, event, self.event_queue.qsize()
-	            #assert current_time >= last_time
-	            last_time = current_time
-	            (new_events, status) = event.run(current_time)
-	            if ((new_events is None) and status == False):
-	            	seen_end_of_file =  True #This means everything in trace file is read completely
-	            else: 
-	            	for new_event in new_events:
-	                	self.event_queue.put(new_event)
-	        if (self.event_queue.empty() and self.task_queue.empty() and seen_end_of_file):
-	        	break
+        self.event_queue.put((current_time*1000) + scheduler_wakeup_timer, PeriodicSchedulerEvent(self))
+        while not self.event_queue.empty():
+        	(current_time, event) = self.event_queue.get()
+            #print current_time, event, self.event_queue.qsize()
+            #assert current_time >= last_time
+            last_time = current_time
+            new_events = event.run(current_time)
+            for new_event in new_events:
+                self.event_queue.put(new_event)
+	        # if (self.event_queue.empty() and self.task_queue.empty() and seen_end_of_file):
+	        # 	break
 
         self.tasks_file.close()
         # Done with queueing all the task in the task_queue
@@ -507,8 +519,8 @@ if __name__=="__main__":
 	config.optimiztion_type = args.optimiztion_type
 	config.scheduling_type =  args.scheduling_type
 	scheduler = Scheduler_cls(config)
-	sim = Simulation(sys.argv[1], args.trace_name, config)
+	sim = Simulation(sys.argv[1], args.trace_name, config, scheduler)
 	sim.run()
-	scheduler.start() # Starting scheduler thread
+	#scheduler.start() # Starting scheduler thread
 	sim.f.close()
 	sim.load_file.close()

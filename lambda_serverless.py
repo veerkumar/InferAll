@@ -19,8 +19,11 @@ from sklearn.linear_model import LinearRegression
 class Lambda(object):
 	
 	def __init__ (self, simulation, config, lambda_batch_idx, lambda_model_idx, lambda_memory_size_idx):
-		threading.Thread.__init__(self)
+		#threading.Thread.__init__(self)
 		self.simulation = simulation
+		self.start_time = current_time
+		self.isIdle = True
+        self.lastIdleTime = current_time
 		self.config =  config
 		self.batch_size_idx = lambda_batch_idx
 		self.model_type_idx = lambda_model_idx

@@ -29,44 +29,36 @@ class VM(object):
         self.spin_up = spin_up
         #print("adding worker id and type",self.id,self.task_type)
         #A VM can execute any type of task, but during execution, it will make VM exclusive for that task
-        # if task_type == 0:
-        #     self.free_slots = 6
-        #     self.max_slots = 6
-        # if task_type == 1:
-        #     self.free_slots = 5
-        #     self.max_slots = 5
-        # if task_type == 2:
-        #     self.free_slots = 2
-        #     self.max_slots = 2
-        self.num_queued_tasks = 0
-
-    def add_task(self, task_id_list, current_time):
-        #print("adding new task to VM", task_id,self.id)
-        #self.queued_tasks.put((current_time,task_id))
-        self.isIdle = False
-        new_events = self.get_task(current_time)
-        self.spin_up = False
-        # self.probes_repliid_to_immediately += len(new_events)
-        # logging.getLogger("sim").debug("Worker %s: %s" %(self.id, self.probes_replied_to_immediately))
-
-        return new_events
+            # if task_type == 0:
+            #     self.free_slots = 6
+            #     self.max_slots = 6
+            # if task_type == 1:
+            #     self.free_slots = 5
+            #     self.max_slots = 5
+            # if task_type == 2:
+            #     self.free_slots = 2
+            #     self.max_slots = 2
 
     def VM_status(self, current_time):
-        if (not self.isIdle and (self.num_queued_tasks == 0)):
+        if (not self.isIdle):
             self.isIdle = True
             self.lastIdleTime = current_time
             return True
         return False
-    def get_task(self, current_time, task_id_list):
-        new_events = []
+
+    def execute_simulated_task(self, vm_event_context, current_time):
+
+        print("In the VM id: {} add_task_function".format(seld.id))
+        print("Executing new tasks {} In the VM", task_id,self.id)
+        #self.queued_tasks.put((current_time,task_id))
+        self.isIdle = False
+        self.spin_up = False
+
+        schedule_event = []
         #print("running task on worker",self.id,self.task_type)
-        for task_id in task_id_list:
-            
-        
-        (queue_time,task_id) = self.queued_tasks.get()
-        task_duration = self.simulation.tasks[task_id].exec_time
+        task_duration = vm_event_context.expected_execution_time
         probe_response_time = 5 + current_time
-        if task_duration > 0:
+        for task_id in task_id_list:
             task_end_time = task_duration + probe_response_time
             #print("worker not empty at time",self.id,self.task_type,task_end_time)
             new_event = TaskEndEvent(self)
@@ -78,26 +70,27 @@ class VM(object):
                 task_end_time,0)):
                 #print "writing to file"
                 print >> finished_file,"num tasks ", task.num_tasks, "," ,"VM_tasks ,", task.vm_tasks,"lambda_tasks ,", task.lambda_tasks , "task_end_time, ", task_end_time, "task_start_time,",task.start_time, " each_task_running_time ,",(task.end_time - task.start_time)
-            return [(task_end_time, new_event)]
-        return []
+                schedule_event.append((task_end_time, new_event))
+        return schedule_event
 
-    def free_slot(self, current_time):
-        self.free_slots += 1
-        #get_task_events = self.get_task(current_time)
-        return []
+    
 
 class ScheduleVMEvent(Event):
 
-    def __init__(self, worker, task_id_list):
+    def __init__(self, worker, vm_batch_size_idx, vm_model_idx, expected_execution_time, task_id_list):
         self.worker = worker
-        self.job_id = job_id
-        self.worker.num_queued_tasks += 1
+        # self.job_id = job_id
+        self.vm_batch_size_idx = vm_batch_size_idx
+        self.vm_model_idx = vm_model_idx
+        self.expected_execution_time =  expected_execution_time
+        self.task_id_list = task_id_list
+
     def run(self, current_time):
         logging.getLogger('sim'
                 ).debug('Probe for job %s arrived at worker %s at %s'
                         % (self.job_id, self.worker.id,
                             current_time))
-        return self.worker.add_task(self.job_id, current_time)
+        return self.worker.execute_simulated_task(self, current_time)
 
 class VMCreateEvent(Event):
     def __init__(self,simulation, VM, task_type):
@@ -116,7 +109,6 @@ class VM_Monitor_Event(Event):
         self.simulation = simulation
     def run(self, current_time):
         new_events = []
-        global last_task
         print("M_monito_EVENT")
         for index in range(3):
             width = len(self.simulation.VMs[index])
@@ -134,6 +126,7 @@ class VM_Monitor_Event(Event):
                             print index, len(self.simulation.completed_VMs[index]),"width changing"
                         width-=1
                 k+=1
-        if(self.simulation.event_queue.qsize() > 1 and last_task==0):
+        if(self.simulation.event_queue.qsize() > 1 and self.simulation.last_task == 0):
             new_events.append((current_time+180000,VM_Monitor_Event(self.simulation)))
+
         return new_events

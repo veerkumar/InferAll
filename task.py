@@ -16,7 +16,12 @@ class TaskArrival(Event):
         # self.task_distribution= task_distribution
 
     def run(self, current_time):
-        global last_task
+        
+        s_time = 0
+        num_tasks = 0
+        task_type = 0
+        last_task = 0
+        last_start_time = 0
         task = Task(current_time, self.num_tasks, self.task_type)
         logging.getLogger('sim').debug('Job %s arrived at %s'
                 % (task.id, current_time))
@@ -25,12 +30,39 @@ class TaskArrival(Event):
         new_events = []
         self.simulation.task_queue.put((task, current_time))
         self.simulation.num_queued_tasks = self.simulation.num_queued_tasks + self.num_tasks
+        line = self.simulation.tasks_file.readline()
+        if line == '':
+                print('task empty')
+                self.simulation.last_task = 1
+                return new_events
+        else:
+            if self.simulation.workload_type == "tweeter_BATCH":
+                s_time = float(line.split('\n')[0])
+                num_tasks = 1
+                task_type = 1
+            else: 
+                s_time = float(line.split(',')[0])
+                num_tasks = line.split(',')[3]
+                task_type = line.split(',')[2]
+            new_events.append((s_time * 1000, TaskArrival(self,
+                s_time * 1000, num_tasks, task_type)))
 
         logging.getLogger('sim').debug('Retuning %s events'
                 % len(new_events))
         
         #print ("task arrival new events", new_events)
         return (new_events, True)
+
+class TaskEndEvent:
+
+    def __init__(self, worker):
+        self.worker = worker
+
+    def run(self, current_time):
+        #print "task end event"
+        self.worker.isIdle = True
+        self.worker.lastIdleTime = current_time
+        return []
 
 class EndOfFileEvent(Event):
     """docstring for EndOfFileEvent"""

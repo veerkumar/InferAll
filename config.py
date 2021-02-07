@@ -83,6 +83,7 @@ class Configuration_cls(object):
 		self.optimiztion_type = 0
 		self.scheduling_type = 0
 		self.rescheduling_limit = 4
+		self.scheduler_wakeup_timer = 100 # in millisecond
 
 
 
