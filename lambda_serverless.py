@@ -17,19 +17,16 @@ from sklearn.linear_model import LinearRegression
 
 
 class Lambda(object):
-class MyServerless(threading.Thread):
 	
-	def __init__ (self, batch_size, queue_time, request_list, actual_batch_size, inter_arrival, time_out, function_name):
+	def __init__ (self, simulation, config, lambda_batch_idx, lambda_model_idx, lambda_memory_size_idx):
 		threading.Thread.__init__(self)
-		self.batch_size = batch_size
-		self.queue_time = queue_time
-		self.request_list = request_list
-		self.actual_batch_size = actual_batch_size
-		self.time_out = time_out
-		self.function_name = function_name
-		
+		self.simulation = simulation
+		self.config =  config
+		self.batch_size_idx = lambda_batch_idx
+		self.model_type_idx = lambda_model_idx
+		self.lambda_memory_size_idx = lambda_memory_size_idx
 	
-	def send_real_request(self):
+	def execute_real_request(self):
 		mylambda =  boto3.client('lambda')
 		mutex_lock2 = threading.Lock()
 		#data= {"batch":"{}".format(self.batch_size)}
@@ -45,17 +42,42 @@ class MyServerless(threading.Thread):
 		mutex_lock2.release()
 		return batch_service_time['Payload'].read()
 
-	def send_simulated_request(self):
+	def execute_simulated_request(self, current_time, task_id_list):
+
+		print("execute_simulated_request: Enter")
+
+		task_duration = self.config.lambda_latency[self.model_type_idx][self.lambda_memory_size_idx][self.batch_size_idx]
+        probe_response_time = 5 + current_time
+        task_end_time = task_duration + probe_response_time
+
+        schedule_event = []
+
+        for task_id in task_id_list:
+
+	        task = self.simulation.tasks[task_id]
+	        if task_duration > 0:
+	            task_end_time = task_duration + probe_response_time
+	            print >> self.simulation.tasks_file,"task_id ,", task.id, ",", "task_type," ,task.task_type,  ",",  "lambda task" , ",task_end_time ,", task_end_time, ",", "task_start_time,",task.start_time, ",", " each_task_running_time,",(task_end_time - task.start_time),",", " task_queuing_time:,", (task_end_time - task.start_time) - task.exec_time
+
+	        if(self.simulation.add_task_completion_time(task_id,
+	            task_end_time,1)):
+
+	            print >> self.simulation.finished_file,"num_tasks ,", task.num_tasks, "," ,"VM_tasks ,", task.vm_tasks,"lambda_tasks ,", task.lambda_tasks ,"task_end_time, ", task_end_time,",", "task_start_time,",task.start_time,",", " each_task_running_time, ",(task.end_time - task.start_time)
+
+	            new_event = TaskEndEvent(self)
+	            schedule_event.append([(task_end_time, new_event)])
+	    print("execute_simulated_request: End")
+        return schedule_event
 
 class ScheduleLambdaEvent(Event):
 
-    def __init__(self, worker, job_id):
+    def __init__(self, worker, task_id_list):
         self.worker = worker
-        self.job_id = job_id
+        self.task_id_list = task_id_list
     def run(self, current_time):
         logging.getLogger('sim'
-                ).debug('Probe for job %s arrived at %s'
-                        % (self.job_id,
+                ).debug('Probe for job list %s arrived at %s'
+                        % (self.task_id_list,
                             current_time))
-        return self.worker.execute_task(self.job_id, current_time)
+        return self.worker.execute_simulated_request(current_time, task_id_list)
 

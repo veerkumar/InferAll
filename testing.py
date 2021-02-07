@@ -4,6 +4,7 @@ import multiprocessing
 from multiprocessing import Process, Queue
 import copy
 import collections
+from pdb import set_trace as bp
 
 import time
 
@@ -23,6 +24,7 @@ class Task(object):
 	def task_scheduler(self, name):
 		print("In tas function function in task")
 		global c, num
+		bp()
 		print(name)
 		logging.info ("Thread: Frist name:" + name)
 		logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
@@ -50,6 +52,7 @@ if __name__=="__main__":
 	logging.info('So should this')
 	logging.warning('And this, too')
 	name = "Veer"
+	print(name)
 	t =  Task(c)
 	
 	x = threading.Thread(target=t.task_scheduler, args=(name,))

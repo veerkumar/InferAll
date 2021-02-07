@@ -14,6 +14,7 @@ class VM(object):
             spin_up,
             id):
         self.simulation = simulation
+        self.config = simulation.configuration
         self.start_time = current_time
         self.up_time = up_time
         self.end_time = current_time
@@ -87,7 +88,7 @@ class VM(object):
 
 class ScheduleVMEvent(Event):
 
-    def __init__(self, worker, job_id):
+    def __init__(self, worker, task_id_list):
         self.worker = worker
         self.job_id = job_id
         self.worker.num_queued_tasks += 1

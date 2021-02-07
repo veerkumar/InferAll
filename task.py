@@ -54,6 +54,11 @@ class SleepEndEvent(Event):
         with self.cond:
                 self.cond.notify_all()
         new_events = []
+        # Now we need to wait for scheduler to enueue its events
+        with self.simulation.simulation_cond:
+            self.simulation.simulation_cond.wait()
+        logging.debug("simulation.event_queue size:",self.simulation.event_queue.qsize())
+
         return (new_events, True)
 
 class SleepStartEvent(Event):
@@ -141,7 +146,7 @@ class Task(object):
         #     self.mem = 3048
 
     def task_completed(self, completion_time):
-        self.completed_tasks += 1
+        self.completed_tasks += self.num_tasks
         self.end_time = max(completion_time, self.end_time)
         assert self.completed_tasks <= self.num_tasks
         return self.num_tasks == self.completed_tasks
