@@ -23,7 +23,6 @@ class PeriodicSchedulerEvent(Event):
 		
 		new_events.append(((current_time + next_wakeup_time), PeriodicSchedulerEvent(self)))
 		return new_events
-		
 
 class PeriodicTimerEvent(Event):
     def __init__(self,simulation):

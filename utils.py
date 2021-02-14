@@ -1,9 +1,4 @@
 
-
-
-
-
-
 def get_percentile(N, percent, key=lambda x:x):
     if not N:
         return 0
