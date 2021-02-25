@@ -2,36 +2,59 @@
 '''
 	This file contains initial configuration needed for the simulator
 '''
+import time
+import logging
+import math
+import random
+import sys
+import os
+import multiprocessing
+from multiprocessing import Process, Queue
+from queue import PriorityQueue
+
+class Event(object):
+    """ Abstract class representing events. """
+
+    def __init__(self):
+        raise NotImplementedError('Event is an abstract class and cannot be instantiated directly'
+                )
+
+    def run(self, current_time):
+        """ Returns any events that should be added to the queue. """
+
+        raise NotImplementedError('The run() method must be implemented by each class subclassing Event'
+                )
 
 class Configuration_cls(object):
 	"""docstring for Configuration_cls"""
-	def __init__(self, arg):
+	
+	def __init__(self):
 		super(Configuration_cls, self).__init__()
-		self.arg = arg
-		self.MAX = 1000000
+		self.MAX = 100000000
 		self.MILL_TO_HR = 1/3600000
-		self.batch_sz = [1,16,32,64,128,256,512,1024,2048,4096,8192,16384]
+		self.batch_sz = [1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192,16384]
 		# Accuracy picked from https://github.com/dmlc/mxnet-model-gallery and 
 		# https://github.com/knjcode/mxnet-finetuner/blob/master/docs/pretrained_models.md
 		self.top1_accuracy = [54.5, 55.4, 71.0, 72.5, 77.9]
 		self.top5_accuracy = [78.3,78.8,89.8, 90.8,93.8]
 		self.models_accuracy = [60,70,80,90,95]
-		self.lambda_models = ["caffenet","squeeznet", "vggnet16","inception", "resnet200",]
+		self.lambda_models = ["caffenet","squeeznet", "vggnet16","inception", "resnet200"]
 		#self.lambda_models = ["caffenet", "inception", "resnet200", "squeeznet","vggnet16"]
-		self.vm_models = ["caffenet","vggnet", "resnet200",]
-		#vm_available_memory = [3696,7610,15438]
-		self.vm_available_memory = [7610,15438]
+		self.vm_models = ["caffenet","squeeznet", "vggnet16","inception", "resnet200"]
+		self.vm_available_memory = [4096,8192,16384]
+		#self.vm_available_memory = [7610,15438]
 		self.vm_cost = [0.085, 0.17, 0.34] # $/hour
 		self.lambda_available_memory = [256,512,1024,2048,3008]
 		# Model x Memory size x BATCH = 5x5x15 =>375
+		MAX= self.MAX
 		self.lambda_latency = [[[MAX,MAX,MAX,MAX,MAX,MAX,MAX,MAX,MAX,MAX,MAX,MAX,MAX,MAX,MAX],
 								[MAX,MAX,MAX,MAX,MAX,MAX,MAX,MAX,MAX,MAX,MAX,MAX,MAX,MAX,MAX],
 								[250,255,255,265,265,285,325,407,552,MAX,MAX,MAX,MAX,MAX,MAX],
 								[140,140,160,160,150,162,195,230,310,530,1100,1500,MAX,MAX,MAX],
 								[135,135,137,140,140,150,170,235,310,500,1000,1500,MAX,MAX,MAX]
 								],[[760,760,760,800,850,970,1200,1650,2500,MAX,MAX,MAX,MAX,MAX,MAX],
-								[335,335,335,345,360,,420,545,750,1150,2150,MAX,MAX,MAX,MAX,MAX],
-								[160,165,168,,170,175,205,255,330,540,850,1600,MAX,MAX,MAX,MAX],
+								[335,335,335,345,360,420,545,750,1150,2150,MAX,MAX,MAX,MAX,MAX],
+								[160,165,168,170,175,205,255,330,540,850,1600,MAX,MAX,MAX,MAX],
 								[85,85,85,85,100,120,135,190,300,500,980,1200,MAX,MAX,MAX],
 								[65,70,75,70,80,100,125,170,325,520,900,1800,2600,MAX,MAX]
 								],[[MAX,MAX,MAX,MAX,MAX,MAX,MAX,MAX,MAX,MAX,MAX,MAX,MAX,MAX,MAX],
@@ -75,6 +98,7 @@ class Configuration_cls(object):
 		self.trace_dir = "traces/"
 
 		self.INITIAL_WORKERS = 10
+		self.DONOT_RESHEDULE = -1
 		self.VM_PREDICTION = 0
 		self.load_tracking = 0
 		self.MONITOR_INTERVAL = int(100000)
@@ -92,11 +116,11 @@ class Configuration_cls(object):
 		self.optimiztion_type = 0
 		self.scheduling_type = 0
 		self.rescheduling_limit = 4
-		self.scheduler_wakeup_timer = 100 # in millisecond
+		self.scheduler_wakeup_timer = 30 # in millisecond
 
 
 
-print ("Lambda latency with batch size [1,16,32,64,128,256,512,1024,2048,4096,8192]")
-for i, element in enumerate(vm_latencey):
-	print(models[i] + ": ", end='')
-	print (element)
+# print ("Lambda latency with batch size [1,16,32,64,128,256,512,1024,2048,4096,8192]")
+# for i, element in enumerate(vm_latency):
+# 	print(models[i] + ": ", end='')
+# 	print (element)

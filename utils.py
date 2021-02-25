@@ -19,8 +19,20 @@ def plot_cdf(values, filename):
         f.write("%s\t%s\n" % (fraction, get_percentile(values, fraction)))
     f.close()
 
+# expected mem in GB and time in /hours (not millisecond)
 def lambda_cost(num, mem, time):
     return float(num*0.0000002 + (num*mem*time*0.00001667))
+
+
+
+import time
+from dataclasses import dataclass, field
+
+@dataclass(order=True)
+class PrioritizedItem:
+    current_time: float
+    timestamp: float = field(init=False, default_factory=time.time)
+    data: object = field(compare=False)
 
 
 def _mkdir(newdir):
@@ -43,4 +55,24 @@ def _mkdir(newdir):
             _mkdir(head)
         if tail:
             os.mkdir(newdir)
+
+def autolog(message):
+    "Automatically log the current function details."
+    import inspect, logging
+    # Get the previous frame in the stack, otherwise it would
+    # be this function!!!
+    func = inspect.currentframe().f_back.f_code
+    # Dump the message + the name of this function to the log.
+    # logging.debug("%s: %s in %s:%i" % (
+    #     message, 
+    #     func.co_name, 
+    #     func.co_filename, 
+    #     func.co_firstlineno
+    # ))
+    logging.getLogger('sim').debug("%s: %s in %s:%i" % (
+        message, 
+        func.co_name, 
+        func.co_filename, 
+        func.co_firstlineno
+    ))
 
