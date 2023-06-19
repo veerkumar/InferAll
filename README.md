@@ -1,7 +1,7 @@
 # InferAll
 InferAll: Coordinated optimization for machine learning inference serving in public cloud.
 
-This repo provides an event-driven based simulator with initial data prepared on AWS EC2 and AWS serverless. 
+This repo provides an event-driven based simulator with initial execution baseline prepared on AWS EC2 and AWS serverless. 
 
 If this project was helpful, please consider citing:
 ```
@@ -12,4 +12,4 @@ If this project was helpful, please consider citing:
   school={Pennsylvania State University}
 }
 ```
-Paper can be downloaded from https://etda.libraries.psu.edu/catalog/18975pjk5502
+The paper can be downloaded from https://etda.libraries.psu.edu/catalog/18975pjk5502
