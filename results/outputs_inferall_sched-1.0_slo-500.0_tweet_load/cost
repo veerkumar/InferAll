@@ -1,0 +1,79 @@
+total VM cost is 9.489065572222227
+36000 complete jobs
+Average response time:  448.7595
+total lambda cost  0
+total cost of deployment  9.489065572222227
+-----------------------------------Popular choices:----------------------------------------------------
+	Popular VM models
+		resnet200 496482
+		caffenet 0
+		squeeznet 0
+		vggnet16 0
+		inception 0
+	Popular VM memory
+		4096 488416
+		8192 6087
+		16384 1979
+	Popular Top 5 VM Batch
+		256 494503
+		512 1979
+		1 0
+		2 0
+		4 0
+		8 0
+	Popular Lambda models
+		caffenet 0
+		squeeznet 0
+		vggnet16 0
+		inception 0
+		resnet200 0
+	Popular lambda memory
+		256 0
+		512 0
+		1024 0
+		2048 0
+		3008 0
+	Popular Top 5 Lambda Batch
+		1 0
+		2 0
+		4 0
+		8 0
+		16 0
+		32 0
+-----------------------------------Most Used Config:----------------------------------------------------
+	Most Used VM models
+		resnet200 486460
+		caffenet 0
+		squeeznet 0
+		vggnet16 0
+		inception 0
+	Most Used VM memory
+		4096 482329
+		8192 4108
+		16384 23
+	Most Used Top 5 VM Batch
+		256 486437
+		512 23
+		1 0
+		2 0
+		4 0
+		8 0
+	Most Used Lambda models
+		caffenet 0
+		squeeznet 0
+		vggnet16 0
+		inception 0
+		resnet200 0
+	Most Used lambda memory
+		256 0
+		512 0
+		1024 0
+		2048 0
+		3008 0
+	Most Used Top 5 Lambda Batch
+		1 0
+		2 0
+		4 0
+		8 0
+		16 0
+		32 0

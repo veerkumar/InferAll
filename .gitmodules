@@ -1,0 +1,3 @@
+[submodule "mxnet-lambda-vm-function"]
+	path = mxnet-lambda-vm-function
+	url = https://github.com/veerkumar/mxnet-lambda-vm-function.git

@@ -1,0 +1,97 @@
+Possible improvement:
+1) Sometime scheduled number of tasks are lesser then the batch size, so we have reevlauate execution time. so it will reduce task execution time.
+2) which VM to scale? 4gb, 8GB, 16GB etc? we can have different answer based on cost and latency. so need to choose one
+
+  python    main_service_simulator.py --trace_type NONBATCH --trace_name test --slo 100 --scheduling_type 0 --execution_mode spock
+
+
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 1000 --scheduling_type 0 
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 500 --scheduling_type 0 
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 300 --scheduling_type 0 
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 200 --scheduling_type 0 
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 100 --scheduling_type 0 
+
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 1000 --scheduling_type 1 
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 500 --scheduling_type 1 
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 300 --scheduling_type 1 
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 200 --scheduling_type 1 
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 100 --scheduling_type 1 
+
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 1000 --scheduling_type 2
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 500 --scheduling_type 2
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 300 --scheduling_type 2
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 200 --scheduling_type 2 
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 100 --scheduling_type 2 
+
+
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 1000 --scheduling_type 0 --execution_mode spock
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 500 --scheduling_type 0 --execution_mode spock
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 300 --scheduling_type 0 --execution_mode spock
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 200 --scheduling_type 0 --execution_mode spock
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 100 --scheduling_type 0 --execution_mode spock
+
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 1000 --scheduling_type 2 --execution_mode batch
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 500 --scheduling_type 2 --execution_mode batch
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 300 --scheduling_type 2 --execution_mode batch
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 200 --scheduling_type 2 --execution_mode batch
+ time python    main_service_simulator.py --trace_type NONBATCH --trace_name tweet_load --slo 100 --scheduling_type 2 --execution_mode batch
+
+
+we dont need any prior process arrival model 
+
+
+
+questions:
+Do we need to consider cost for spinning up the VM ? 
+How do we handle Only VM case? what happen to job which cant be scheduled to VMs 
+
+
+******************************************************************************************************************************
+
+why not fair comparision of spock on latest code
+disadvantage 1) In spock VM has queues to while latest solution doesnt have, which make it to default more to lambda which will be costly in longer traces
+advantage 2) here based on latency- calls to different models and efficiecny is going. for example lambda is always called with squeezenet while in spock imlemenation single mode with higher efficency.
+
+
+In spock model, mem selection is not based on SLO. 
+Most Used VM models
+		inception 102
+		resnet200 51
+		caffenet 0
+		squeeznet 0
+		vggnet16 0
+	Most Used VM memory
+		4096 51
+		8192 51
+		16384 51
+	Most Used Top 5 VM Batch
+		1 153
+		2 0
+		4 0
+		8 0
+		16 0
+		32 0
+	Most Used Lambda models
+		squeeznet 2427
+		caffenet 0
+		vggnet16 0
+		inception 0
+		resnet200 0
+	Most Used lambda memory
+		2048 2427
+		256 0
+		512 0
+		1024 0
+		3008 0
+	Most Used Top 5 Lambda Batch
+		1 2427
+		2 0
+		4 0
+		8 0
+		16 0
+		32 0
+
+paralelizm in VM is depended on memory usage not CPU as RAM finished way before CPU.
+
+ object-oriented modular discrete event 
+ https://doc.omnetpp.org/omnetpp/manual/
